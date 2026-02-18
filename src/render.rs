@@ -6,6 +6,7 @@ use syntect::easy::HighlightLines;
 use syntect::highlighting::ThemeSet;
 use syntect::parsing::SyntaxSet;
 use syntect::util::LinesWithEndings;
+use unicode_width::UnicodeWidthStr;
 
 /// Markdown ソースをパースし、ratatui の Line ベクターに変換する
 pub fn render_markdown(source: &str) -> Vec<Line<'static>> {
@@ -388,7 +389,7 @@ fn render_table<'a>(node: &'a comrak::nodes::AstNode<'a>, lines: &mut Vec<Line<'
     for (_, row) in &rows {
         for (i, cell) in row.iter().enumerate() {
             if i < num_cols {
-                col_widths[i] = col_widths[i].max(cell.len());
+                col_widths[i] = col_widths[i].max(cell.width());
             }
         }
     }
@@ -401,9 +402,11 @@ fn render_table<'a>(node: &'a comrak::nodes::AstNode<'a>, lines: &mut Vec<Line<'
         };
         let mut spans = vec![Span::styled("│ ", border_style)];
         for (i, cell) in row.iter().enumerate() {
-            let width = col_widths.get(i).copied().unwrap_or(0);
+            let col_w = col_widths.get(i).copied().unwrap_or(0);
+            // 表示幅ベースでスペースを手動パディング
+            let padding = col_w.saturating_sub(cell.width());
             spans.push(Span::styled(
-                format!("{:<width$}", cell, width = width),
+                format!("{}{}", cell, " ".repeat(padding)),
                 style,
             ));
             spans.push(Span::styled(" │ ", border_style));

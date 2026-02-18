@@ -11,7 +11,7 @@ use ratatui::crossterm::terminal::{
 use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::Paragraph;
+use ratatui::widgets::{Paragraph, Wrap};
 use unicode_width::UnicodeWidthStr;
 
 /// アプリケーションモード
@@ -230,7 +230,7 @@ impl App {
             .iter()
             .map(|line| self.highlight_line(line))
             .collect();
-        let content = Paragraph::new(visible_lines);
+        let content = Paragraph::new(visible_lines).wrap(Wrap { trim: false });
         frame.render_widget(content, chunks[0]);
 
         // ステータスバー

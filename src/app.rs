@@ -10,7 +10,7 @@ use ratatui::crossterm::terminal::{
 };
 use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Color, Style};
-use ratatui::text::Line;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use unicode_width::UnicodeWidthStr;
 
@@ -188,14 +188,87 @@ impl App {
         let chunks =
             Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(frame.area());
 
-        // Paragraph::scroll は u16 なので上限をクランプ
-        let scroll_row = self.scroll.min(u16::MAX as usize) as u16;
-        let content = Paragraph::new(self.lines.clone()).scroll((scroll_row, 0));
+        // 可視範囲の行だけ取り出してハイライト適用
+        let visible_end = (self.scroll + self.viewport_height).min(self.lines.len());
+        let visible_lines: Vec<Line<'static>> = self.lines[self.scroll..visible_end]
+            .iter()
+            .map(|line| self.highlight_line(line))
+            .collect();
+        let content = Paragraph::new(visible_lines);
         frame.render_widget(content, chunks[0]);
 
         // ステータスバー
         let status = self.build_status_bar(chunks[1].width);
         frame.render_widget(status, chunks[1]);
+    }
+
+    /// 検索クエリにマッチした部分を黄色背景でハイライトする
+    fn highlight_line(&self, line: &Line<'static>) -> Line<'static> {
+        if self.search_query.is_empty() {
+            return line.clone();
+        }
+
+        // 全 Span のテキストを結合し、各 Span の範囲を記録
+        let mut full_text = String::new();
+        let mut span_ranges: Vec<(usize, usize, Style)> = Vec::new();
+        for span in &line.spans {
+            let start = full_text.len();
+            full_text.push_str(&span.content);
+            span_ranges.push((start, full_text.len(), span.style));
+        }
+
+        // マッチ位置を検出（大文字小文字を無視）
+        let query_lower = self.search_query.to_lowercase();
+        let text_lower = full_text.to_lowercase();
+        let mut match_ranges: Vec<(usize, usize)> = Vec::new();
+        let mut pos = 0;
+        while let Some(found) = text_lower[pos..].find(&query_lower) {
+            let abs = pos + found;
+            match_ranges.push((abs, abs + query_lower.len()));
+            pos = abs + query_lower.len();
+        }
+
+        if match_ranges.is_empty() {
+            return line.clone();
+        }
+
+        let hl_style = Style::default().fg(Color::Black).bg(Color::Yellow);
+        let mut new_spans: Vec<Span<'static>> = Vec::new();
+
+        for &(sp_start, sp_end, original_style) in &span_ranges {
+            let span_text = &full_text[sp_start..sp_end];
+            let mut offset = 0;
+
+            for &(m_start, m_end) in &match_ranges {
+                if m_end <= sp_start || m_start >= sp_end {
+                    continue;
+                }
+                // マッチ範囲をこの Span の境界にクランプ
+                let hl_start = m_start.max(sp_start) - sp_start;
+                let hl_end = m_end.min(sp_end) - sp_start;
+
+                if hl_start > offset {
+                    new_spans.push(Span::styled(
+                        span_text[offset..hl_start].to_string(),
+                        original_style,
+                    ));
+                }
+                new_spans.push(Span::styled(
+                    span_text[hl_start..hl_end].to_string(),
+                    hl_style,
+                ));
+                offset = hl_end;
+            }
+
+            if offset < span_text.len() {
+                new_spans.push(Span::styled(
+                    span_text[offset..].to_string(),
+                    original_style,
+                ));
+            }
+        }
+
+        Line::from(new_spans)
     }
 
     fn build_status_bar(&self, width: u16) -> Paragraph<'static> {

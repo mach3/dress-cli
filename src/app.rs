@@ -20,6 +20,8 @@ enum Mode {
     Normal,
     /// 検索入力モード（/ キー押下後）
     Search,
+    /// コマンド入力モード（: キー押下後）
+    Command,
 }
 
 /// TUI アプリケーションの状態
@@ -42,6 +44,8 @@ pub struct App {
     search_matches: Vec<usize>,
     /// 現在のマッチカーソル位置
     search_cursor: usize,
+    /// コマンド入力（: キー押下後）
+    command_input: String,
     /// 終了フラグ
     should_quit: bool,
 }
@@ -58,6 +62,7 @@ impl App {
             search_query: String::new(),
             search_matches: Vec::new(),
             search_cursor: 0,
+            command_input: String::new(),
             should_quit: false,
         }
     }
@@ -111,6 +116,7 @@ impl App {
         match self.mode {
             Mode::Normal => self.handle_normal_key(key),
             Mode::Search => self.handle_search_key(key),
+            Mode::Command => self.handle_command_key(key),
         }
     }
 
@@ -151,6 +157,12 @@ impl App {
                 self.search_input.clear();
             }
 
+            // コマンドモード
+            KeyCode::Char(':') => {
+                self.mode = Mode::Command;
+                self.command_input.clear();
+            }
+
             // 次/前のマッチ
             KeyCode::Char('n') => self.jump_next_match(),
             KeyCode::Char('N') => self.jump_prev_match(),
@@ -179,6 +191,30 @@ impl App {
             }
             KeyCode::Char(c) => {
                 self.search_input.push(c);
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_command_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Enter => {
+                if let Ok(line_num) = self.command_input.parse::<usize>() {
+                    // 1-indexed → 0-indexed にして行ジャンプ
+                    self.scroll = line_num.saturating_sub(1).min(self.max_scroll());
+                }
+                self.command_input.clear();
+                self.mode = Mode::Normal;
+            }
+            KeyCode::Esc => {
+                self.command_input.clear();
+                self.mode = Mode::Normal;
+            }
+            KeyCode::Backspace => {
+                self.command_input.pop();
+            }
+            KeyCode::Char(c) if c.is_ascii_digit() => {
+                self.command_input.push(c);
             }
             _ => {}
         }
@@ -286,6 +322,7 @@ impl App {
 
         let left = match &self.mode {
             Mode::Search => format!("/{}", self.search_input),
+            Mode::Command => format!(":{}", self.command_input),
             Mode::Normal => {
                 if !self.search_query.is_empty() && !self.search_matches.is_empty() {
                     format!(

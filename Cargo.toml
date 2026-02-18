@@ -3,6 +3,7 @@ name = "dress-cli"
 version = "0.1.0"
 edition = "2024"
 description = "Render Markdown in the terminal with paging and vim keybindings"
+repository = "https://github.com/mach3/dress-cli"
 
 [[bin]]
 name = "dress"
@@ -36,3 +37,8 @@ opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

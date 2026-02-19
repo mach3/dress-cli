@@ -13,6 +13,12 @@ Markdown をターミナルで美しく表示する CLI ツール。
 
 ## Install
 
+### Cargo
+
+```sh
+cargo install dress-cli
+```
+
 ### Shell script (macOS / Linux)
 
 ```sh

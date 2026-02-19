@@ -1,4 +1,4 @@
-use comrak::nodes::NodeValue;
+use comrak::nodes::{AlertType, NodeValue};
 use comrak::{Arena, Options, parse_document};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -29,6 +29,7 @@ fn comrak_options<'a>() -> Options<'a> {
     opts.extension.table = true;
     opts.extension.autolink = true;
     opts.extension.tasklist = true;
+    opts.extension.alerts = true;
     opts
 }
 
@@ -94,6 +95,37 @@ fn walk_blocks<'a>(
                 let is_ordered = list.list_type == comrak::nodes::ListType::Ordered;
                 drop(data);
                 render_list_items(child, lines, list_depth, is_ordered, start);
+                lines.push(Line::raw(""));
+            }
+
+            NodeValue::Alert(alert) => {
+                let alert_type = alert.alert_type;
+                let title = alert
+                    .title
+                    .clone()
+                    .unwrap_or_else(|| alert_type.default_title());
+                drop(data);
+
+                let color = alert_color(alert_type);
+                let icon = alert_icon(alert_type);
+                let title_style = Style::default().fg(color).add_modifier(Modifier::BOLD);
+                lines.push(Line::from(Span::styled(
+                    format!("{} {}", icon, title),
+                    title_style,
+                )));
+
+                let mut inner_lines = Vec::new();
+                walk_blocks(child, ss, ts, &mut inner_lines, list_depth);
+                let bar_style = Style::default().fg(color);
+                for line in inner_lines {
+                    let mut spans = vec![Span::styled("│ ", bar_style)];
+                    spans.extend(
+                        line.spans
+                            .into_iter()
+                            .map(|s| Span::styled(s.content.into_owned(), s.style.fg(color))),
+                    );
+                    lines.push(Line::from(spans));
+                }
                 lines.push(Line::raw(""));
             }
 
@@ -327,6 +359,28 @@ fn heading_style(level: u8) -> Style {
     }
 }
 
+/// アラート種別に対応する色を返す
+fn alert_color(alert_type: AlertType) -> Color {
+    match alert_type {
+        AlertType::Note => Color::Blue,
+        AlertType::Tip => Color::Green,
+        AlertType::Important => Color::Magenta,
+        AlertType::Warning => Color::Yellow,
+        AlertType::Caution => Color::Red,
+    }
+}
+
+/// アラート種別に対応するアイコンを返す
+fn alert_icon(alert_type: AlertType) -> &'static str {
+    match alert_type {
+        AlertType::Note => "ℹ",
+        AlertType::Tip => "💡",
+        AlertType::Important => "❗",
+        AlertType::Warning => "⚠",
+        AlertType::Caution => "🔴",
+    }
+}
+
 /// syntect でコードブロックをハイライトする
 fn highlight_code(code: &str, lang: &str, ss: &SyntaxSet, ts: &ThemeSet) -> Vec<Line<'static>> {
     let syntax = if lang.is_empty() {
@@ -487,5 +541,30 @@ mod tests {
         let md = "| A | B |\n|---|---|\n| 1 | 2 |";
         let lines = render_markdown(md);
         assert!(lines.len() >= 2);
+    }
+
+    #[test]
+    fn test_alert_note_renders() {
+        let md = "> [!NOTE]\n> This is a note.";
+        let lines = render_markdown(md);
+        let all_text: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(all_text.contains("Note"), "should contain alert title");
+        assert!(all_text.contains("This is a note."), "should contain body");
+    }
+
+    #[test]
+    fn test_alert_warning_renders() {
+        let md = "> [!WARNING]\n> Be careful.";
+        let lines = render_markdown(md);
+        let all_text: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(all_text.contains("Warning"));
     }
 }

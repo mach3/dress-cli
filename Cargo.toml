@@ -4,6 +4,7 @@ version = "0.2.0"
 edition = "2024"
 description = "Render Markdown in the terminal with paging and vim keybindings"
 repository = "https://github.com/mach3/dress-cli"
+license = "MIT"
 
 [[bin]]
 name = "dress"

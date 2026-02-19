@@ -14,7 +14,7 @@ pub fn render_markdown(source: &str) -> Vec<Line<'static>> {
     let opts = comrak_options();
     let root = parse_document(&arena, source, &opts);
 
-    let ss = SyntaxSet::load_defaults_newlines();
+    let ss = two_face::syntax::extra_newlines();
     let ts = ThemeSet::load_defaults();
 
     let mut lines = Vec::new();

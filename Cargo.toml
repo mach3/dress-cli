@@ -19,10 +19,10 @@ comrak = { version = "0.36", default-features = false }
 
 # Syntax highlighting
 syntect = { version = "5.2", default-features = false, features = [
-    "default-syntaxes",
     "default-themes",
     "regex-onig",
 ] }
+two-face = { version = "0.5", features = ["syntect-onig"] }
 
 # CLI argument parsing
 clap = { version = "4.5", features = ["derive"] }

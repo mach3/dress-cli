@@ -94,6 +94,7 @@ fn walk_blocks<'a>(
                 let is_ordered = list.list_type == comrak::nodes::ListType::Ordered;
                 drop(data);
                 render_list_items(child, lines, list_depth, is_ordered, start);
+                lines.push(Line::raw(""));
             }
 
             NodeValue::BlockQuote => {
@@ -108,6 +109,7 @@ fn walk_blocks<'a>(
                     }));
                     lines.push(Line::from(spans));
                 }
+                lines.push(Line::raw(""));
             }
 
             NodeValue::ThematicBreak => {
